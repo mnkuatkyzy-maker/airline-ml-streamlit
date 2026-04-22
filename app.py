@@ -14,12 +14,8 @@ def load_model():
 
 model = load_model()
 
-# SHAP explainer (для XGBoost внутри pipeline)
-@st.cache_resource
-def load_explainer(model):
-    return shap.TreeExplainer(model.named_steps['clf'])
-
-explainer = load_explainer(model)
+# ❗ без cache — иначе ошибка hashing
+explainer = shap.TreeExplainer(model.named_steps['clf'])
 
 # =============================
 # CONFIG
@@ -91,7 +87,6 @@ input_dict = {
 }
 
 input_dict.update(service_values)
-
 input_df = pd.DataFrame([input_dict])
 
 # =============================
@@ -118,18 +113,17 @@ if st.button("Predict"):
     st.subheader("🔍 SHAP Explanation")
 
     try:
-        # трансформация через pipeline
+        # transform через pipeline
         X_transformed = model.named_steps['pre'].transform(input_df)
 
-        # shap values
         shap_values = explainer.shap_values(X_transformed)
 
-        # если возвращает список (иногда бывает)
+        # иногда shap возвращает список
         if isinstance(shap_values, list):
             shap_values = shap_values[1]
 
-        # Waterfall plot (1 observation)
-        fig = plt.figure()
+        # waterfall plot
+        fig, ax = plt.subplots()
         shap.plots.waterfall(shap_values[0], show=False)
         st.pyplot(fig)
 
