@@ -14,8 +14,21 @@ def load_model():
 
 model = load_model()
 
-# ❗ без cache — иначе ошибка hashing
+# SHAP explainer
 explainer = shap.TreeExplainer(model.named_steps['clf'])
+
+# =============================
+# GET FEATURE NAMES (🔥 ВАЖНО)
+# =============================
+preprocessor = model.named_steps['pre']
+
+num_features = preprocessor.transformers_[0][2]
+
+cat_features = preprocessor.transformers_[1][1]\
+    .named_steps['encoder']\
+    .get_feature_names_out(preprocessor.transformers_[1][2])
+
+feature_names = list(num_features) + list(cat_features)
 
 # =============================
 # CONFIG
@@ -103,28 +116,35 @@ if st.button("Predict"):
     else:
         st.error(f"❌ Not satisfied ({prob:.2%})")
 
-    # Debug (можно убрать потом)
     st.subheader("Input Data")
     st.write(input_df)
 
     # =============================
-  # =============================
-# SHAP
-# =============================
-st.subheader("🔍 SHAP Explanation")
+    # SHAP
+    # =============================
+    st.subheader("🔍 SHAP Explanation")
 
-try:
-    # transform
-    X_transformed = model.named_steps['pre'].transform(input_df)
+    try:
+        X_transformed = model.named_steps['pre'].transform(input_df)
 
-    # ✅ НОВЫЙ способ (Explanation object)
-    shap_values = explainer(X_transformed)
+        shap_values = explainer(X_transformed)
 
-    # waterfall plot
-    fig, ax = plt.subplots()
-    shap.plots.waterfall(shap_values[0], show=False)
-    st.pyplot(fig)
+        # 👇 добавляем имена фич
+        shap_values.feature_names = feature_names
 
-except Exception as e:
-    st.warning("SHAP failed to render")
-    st.text(str(e))
+        fig, ax = plt.subplots()
+        shap.plots.waterfall(shap_values[0], show=False)
+        st.pyplot(fig)
+
+        # 🔥 Бонус: топ фичи текстом
+        st.subheader("Top factors:")
+
+        values = shap_values.values[0]
+        top_idx = np.argsort(np.abs(values))[::-1][:5]
+
+        for i in top_idx:
+            st.write(f"{feature_names[i]}: {values[i]:.3f}")
+
+    except Exception as e:
+        st.warning("SHAP failed to render")
+        st.text(str(e))
