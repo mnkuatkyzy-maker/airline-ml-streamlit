@@ -108,25 +108,23 @@ if st.button("Predict"):
     st.write(input_df)
 
     # =============================
-    # SHAP
-    # =============================
-    st.subheader("🔍 SHAP Explanation")
+  # =============================
+# SHAP
+# =============================
+st.subheader("🔍 SHAP Explanation")
 
-    try:
-        # transform через pipeline
-        X_transformed = model.named_steps['pre'].transform(input_df)
+try:
+    # transform
+    X_transformed = model.named_steps['pre'].transform(input_df)
 
-        shap_values = explainer.shap_values(X_transformed)
+    # ✅ НОВЫЙ способ (Explanation object)
+    shap_values = explainer(X_transformed)
 
-        # иногда shap возвращает список
-        if isinstance(shap_values, list):
-            shap_values = shap_values[1]
+    # waterfall plot
+    fig, ax = plt.subplots()
+    shap.plots.waterfall(shap_values[0], show=False)
+    st.pyplot(fig)
 
-        # waterfall plot
-        fig, ax = plt.subplots()
-        shap.plots.waterfall(shap_values[0], show=False)
-        st.pyplot(fig)
-
-    except Exception as e:
-        st.warning("SHAP failed to render")
-        st.text(str(e))
+except Exception as e:
+    st.warning("SHAP failed to render")
+    st.text(str(e))
