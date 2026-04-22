@@ -1,16 +1,99 @@
 import streamlit as st
+import pandas as pd
+import numpy as np
 import joblib
 
-st.title("✈️ Airline App")
-
-# 👉 показываем, что приложение стартовало
-st.write("🚀 App started")
-
+# =============================
+# LOAD MODEL
+# =============================
 @st.cache_resource
 def load_model():
-    st.write("⏳ Loading model...")
-    model = joblib.load("xgb_pipeline.pkl")
-    st.write("✅ Model loaded")
-    return model
+    return joblib.load("xgb_pipeline.pkl")
 
 model = load_model()
+
+# =============================
+# CONFIG
+# =============================
+st.set_page_config(page_title="Airline Predictor", layout="centered")
+st.title("✈️ Airline Satisfaction Predictor")
+
+# =============================
+# INPUT
+# =============================
+st.header("Passenger Info")
+
+age = st.slider("Age", 10, 80, 30)
+distance = st.number_input("Flight Distance", 100, 5000, 1000)
+
+delay_dep = st.number_input("Departure Delay", 0, 500, 10)
+delay_arr = st.number_input("Arrival Delay", 0, 500, 10)
+
+gender = st.selectbox("Gender", ["Male", "Female"])
+customer_type = st.selectbox("Customer Type", ["Loyal Customer", "disloyal Customer"])
+travel_type = st.selectbox("Type of Travel", ["Business travel", "Personal Travel"])
+flight_class = st.selectbox("Class", ["Business", "Eco", "Eco Plus"])
+
+# =============================
+# SERVICES
+# =============================
+st.subheader("Service Ratings (0–5)")
+
+SERVICE_COLS = [
+    'Inflight wifi service', 'Departure/Arrival time convenient',
+    'Ease of Online booking', 'Gate location', 'Food and drink',
+    'Online boarding', 'Seat comfort', 'Inflight entertainment',
+    'On-board service', 'Leg room service', 'Baggage handling',
+    'Checkin service', 'Inflight service', 'Cleanliness'
+]
+
+service_values = {}
+for col in SERVICE_COLS:
+    service_values[col] = st.slider(col, 0, 5, 3)
+
+# =============================
+# FEATURE ENGINEERING
+# =============================
+Total_delay = delay_dep + delay_arr
+Log_Flight_Distance = np.log1p(distance)
+Service_avg = np.mean(list(service_values.values()))
+
+if age <= 25:
+    Age_group = "Young"
+elif age <= 60:
+    Age_group = "Middle"
+else:
+    Age_group = "Senior"
+
+# =============================
+# CREATE INPUT
+# =============================
+input_dict = {
+    'Age': age,
+    'Flight Distance': distance,
+    'Total_delay': Total_delay,
+    'Log_Flight_Distance': Log_Flight_Distance,
+    'Service_avg': Service_avg,
+    'Gender': gender,
+    'Customer Type': customer_type,
+    'Type of Travel': travel_type,
+    'Class': flight_class,
+    'Age_group': Age_group
+}
+
+input_dict.update(service_values)
+
+input_df = pd.DataFrame([input_dict])
+
+# =============================
+# PREDICTION
+# =============================
+if st.button("Predict"):
+
+    pred = model.predict(input_df)[0]
+    prob = model.predict_proba(input_df)[0][1]
+
+    if pred == 1:
+        st.success(f"✅ Satisfied ({prob:.2%})")
+    else:
+        st.error(f"❌ Not satisfied ({prob:.2%})")
