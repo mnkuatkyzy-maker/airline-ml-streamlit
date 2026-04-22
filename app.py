@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+import shap
+import matplotlib.pyplot as plt
 
 # =============================
 # LOAD MODEL
@@ -11,6 +13,13 @@ def load_model():
     return joblib.load("xgb_pipeline.pkl")
 
 model = load_model()
+
+# SHAP explainer (для XGBoost внутри pipeline)
+@st.cache_resource
+def load_explainer(model):
+    return shap.TreeExplainer(model.named_steps['clf'])
+
+explainer = load_explainer(model)
 
 # =============================
 # CONFIG
@@ -86,10 +95,11 @@ input_dict.update(service_values)
 input_df = pd.DataFrame([input_dict])
 
 # =============================
-# PREDICTION
+# PREDICTION + SHAP
 # =============================
 if st.button("Predict"):
 
+    # Prediction
     pred = model.predict(input_df)[0]
     prob = model.predict_proba(input_df)[0][1]
 
@@ -97,3 +107,32 @@ if st.button("Predict"):
         st.success(f"✅ Satisfied ({prob:.2%})")
     else:
         st.error(f"❌ Not satisfied ({prob:.2%})")
+
+    # Debug (можно убрать потом)
+    st.subheader("Input Data")
+    st.write(input_df)
+
+    # =============================
+    # SHAP
+    # =============================
+    st.subheader("🔍 SHAP Explanation")
+
+    try:
+        # трансформация через pipeline
+        X_transformed = model.named_steps['pre'].transform(input_df)
+
+        # shap values
+        shap_values = explainer.shap_values(X_transformed)
+
+        # если возвращает список (иногда бывает)
+        if isinstance(shap_values, list):
+            shap_values = shap_values[1]
+
+        # Waterfall plot (1 observation)
+        fig = plt.figure()
+        shap.plots.waterfall(shap_values[0], show=False)
+        st.pyplot(fig)
+
+    except Exception as e:
+        st.warning("SHAP failed to render")
+        st.text(str(e))
