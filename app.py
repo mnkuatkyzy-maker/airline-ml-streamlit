@@ -3,13 +3,24 @@ import pandas as pd
 import numpy as np
 import joblib
 
-st.title("✈️ Airline Satisfaction Predictor")
+st.title("✈️ Airline Passenger Satisfaction")
 
-model = joblib.load("xgb_pipeline.pkl")
+# -------------------------------
+# LOAD MODEL (FIX: cache)
+# -------------------------------
+@st.cache_resource
+def load_model():
+    return joblib.load("xgb_pipeline.pkl")
 
-st.header("Passenger Info")
+st.write("🔄 Loading model...")
+model = load_model()
+st.success("✅ Model loaded")
 
-# --- BASIC ---
+# -------------------------------
+# INPUT
+# -------------------------------
+st.header("Enter Passenger Data")
+
 age = st.slider("Age", 0, 100, 30)
 distance = st.number_input("Flight Distance", 0, 10000, 1000)
 
@@ -38,9 +49,12 @@ checkin = st.slider("Checkin service", 0, 5, 3)
 inflight = st.slider("Inflight service", 0, 5, 3)
 clean = st.slider("Cleanliness", 0, 5, 3)
 
-# --- FEATURE ENGINEERING ---
+# -------------------------------
+# FEATURE ENGINEERING
+# -------------------------------
 total_delay = dep_delay + arr_delay
 log_distance = np.log1p(distance)
+
 service_avg = np.mean([
     wifi, time_conv, booking, gate, food, boarding,
     seat, ent, onboard, leg, baggage, checkin,
@@ -54,7 +68,9 @@ elif age < 60:
 else:
     age_group = "Senior"
 
-# --- DATAFRAME ---
+# -------------------------------
+# DATAFRAME (ВАЖНО: ВСЕ КОЛОНКИ)
+# -------------------------------
 input_df = pd.DataFrame([{
     "Age": age,
     "Flight Distance": distance,
@@ -82,12 +98,19 @@ input_df = pd.DataFrame([{
     "Age_group": age_group
 }])
 
-# --- PREDICT ---
+# -------------------------------
+# PREDICTION
+# -------------------------------
 if st.button("Predict"):
-    pred = model.predict(input_df)[0]
-    prob = model.predict_proba(input_df)[0][1]
+    try:
+        pred = model.predict(input_df)[0]
+        prob = model.predict_proba(input_df)[0][1]
 
-    if pred == 1:
-        st.success(f"✅ Satisfied ({prob:.2f})")
-    else:
-        st.error(f"❌ Not satisfied ({prob:.2f})")
+        if pred == 1:
+            st.success(f"✅ Satisfied (probability: {prob:.2f})")
+        else:
+            st.error(f"❌ Not satisfied (probability: {prob:.2f})")
+
+    except Exception as e:
+        st.error("⚠️ Error during prediction")
+        st.write(e)
