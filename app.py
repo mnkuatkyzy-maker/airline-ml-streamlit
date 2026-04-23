@@ -174,7 +174,7 @@ if st.button("🚀 Predict"):
 
     if show_shap:
       try:
-    with st.spinner("Calculating SHAP..."):
+        with st.spinner("Calculating SHAP..."):
 
         X_transformed = transform_input(input_df)
 
