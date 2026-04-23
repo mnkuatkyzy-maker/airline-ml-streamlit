@@ -6,7 +6,7 @@ import shap
 import matplotlib.pyplot as plt
 
 # =============================
-# PAGE CONFIG
+# CONFIG
 # =============================
 st.set_page_config(page_title="Airline Predictor", layout="centered")
 
@@ -20,17 +20,16 @@ def load_model():
 model = load_model()
 
 # =============================
-# LOAD SHAP (FIXED ✅)
+# LOAD SHAP (без hashing ошибки)
 # =============================
 @st.cache_resource
 def load_explainer():
-    # НЕ передаем model в аргументы → нет ошибки hashing
     return shap.TreeExplainer(model.named_steps['clf'])
 
 explainer = load_explainer()
 
 # =============================
-# PREPROCESSOR + FEATURE NAMES
+# PREPROCESSOR
 # =============================
 preprocessor = model.named_steps['pre']
 
@@ -50,19 +49,16 @@ def transform_input(df):
     return model.named_steps['pre'].transform(df)
 
 # =============================
-# TITLE
+# UI
 # =============================
 st.title("✈️ Airline Satisfaction Predictor")
 
-st.markdown("""
-Predict whether a passenger is **satisfied** based on flight and service data.  
-Model: **XGBoost (~96% accuracy)**
-""")
+st.markdown("Predict passenger satisfaction using ML model (XGBoost)")
 
 # =============================
-# SIDEBAR INPUT
+# SIDEBAR
 # =============================
-st.sidebar.header("🧾 Passenger Info")
+st.sidebar.header("Passenger Info")
 
 age = st.sidebar.slider("Age", 10, 80, 30)
 distance = st.sidebar.number_input("Flight Distance", 100, 5000, 1000)
@@ -75,7 +71,7 @@ flight_class = st.sidebar.selectbox("Class", ["Business", "Eco", "Eco Plus"])
 # =============================
 # MAIN INPUT
 # =============================
-st.header("✈️ Flight Details")
+st.header("Flight Details")
 
 col1, col2 = st.columns(2)
 
@@ -88,7 +84,7 @@ with col2:
 # =============================
 # SERVICES
 # =============================
-st.subheader("⭐ Service Ratings")
+st.subheader("Service Ratings")
 
 SERVICE_COLS = [
     'Inflight wifi service', 'Departure/Arrival time convenient',
@@ -100,7 +96,7 @@ SERVICE_COLS = [
 
 service_values = {}
 
-with st.expander("Adjust service ratings (optional)"):
+with st.expander("Adjust service ratings"):
     for col in SERVICE_COLS:
         service_values[col] = st.slider(col, 0, 5, 3)
 
@@ -119,7 +115,7 @@ else:
     Age_group = "Senior"
 
 # =============================
-# CREATE INPUT
+# INPUT DF
 # =============================
 input_dict = {
     'Age': age,
@@ -142,72 +138,60 @@ input_df = pd.DataFrame([input_dict])
 # =============================
 st.divider()
 
-if st.button("🚀 Predict"):
+if st.button("Predict"):
 
-    with st.spinner("Analyzing passenger..."):
-
+    with st.spinner("Analyzing..."):
         pred = model.predict(input_df)[0]
         prob = model.predict_proba(input_df)[0][1]
 
-    # =============================
-    # RESULT
-    # =============================
-    st.subheader("📊 Result")
-
+    st.subheader("Result")
     st.metric("Satisfaction Probability", f"{prob:.2%}")
 
     if pred == 1:
-        st.success("✅ Passenger is likely satisfied")
+        st.success("Satisfied")
     else:
-        st.error("❌ Passenger is NOT satisfied")
-
-    # =============================
-    # INPUT DATA
-    # =============================
-    with st.expander("📄 View input data"):
-        st.write(input_df)
+        st.error("Not satisfied")
 
     # =============================
     # SHAP
     # =============================
-    show_shap = st.checkbox("🔍 Show model explanation (SHAP)")
+    show_shap = st.checkbox("Show SHAP explanation")
 
     if show_shap:
-    try:
-        with st.spinner("Calculating SHAP..."):
+        try:
+            with st.spinner("Calculating SHAP..."):
 
-            X_transformed = transform_input(input_df)
+                X_transformed = transform_input(input_df)
 
-            # SHAP
-            shap_values = explainer.shap_values(X_transformed)
+                shap_values = explainer.shap_values(X_transformed)
 
-            if isinstance(shap_values, list):
-                shap_values = shap_values[1]
+                if isinstance(shap_values, list):
+                    shap_values = shap_values[1]
 
-            # Plot
-            fig, ax = plt.subplots()
-            shap.waterfall_plot(
-                shap.Explanation(
-                    values=shap_values[0],
-                    base_values=explainer.expected_value,
-                    data=X_transformed[0],
-                    feature_names=feature_names
-                ),
-                show=False
-            )
+                fig, ax = plt.subplots()
 
-            st.pyplot(fig)
+                shap.waterfall_plot(
+                    shap.Explanation(
+                        values=shap_values[0],
+                        base_values=explainer.expected_value,
+                        data=X_transformed[0],
+                        feature_names=feature_names
+                    ),
+                    show=False
+                )
 
-            # TOP FEATURES
-            st.subheader("Top factors")
+                st.pyplot(fig)
 
-            values = shap_values[0]
-            top_idx = np.argsort(np.abs(values))[::-1][:5]
+                # TOP FEATURES
+                st.subheader("Top factors")
 
-            for i in top_idx:
-                impact = "⬆️ increases" if values[i] > 0 else "⬇️ decreases"
-                st.write(f"{feature_names[i]} {impact} satisfaction ({values[i]:.3f})")
+                values = shap_values[0]
+                top_idx = np.argsort(np.abs(values))[::-1][:5]
 
-    except Exception as e:
-        st.error("SHAP error")
-        st.text(str(e))
+                for i in top_idx:
+                    impact = "⬆️ increases" if values[i] > 0 else "⬇️ decreases"
+                    st.write(f"{feature_names[i]} {impact} satisfaction ({values[i]:.3f})")
+
+        except Exception as e:
+            st.error("SHAP error")
+            st.text(str(e))
