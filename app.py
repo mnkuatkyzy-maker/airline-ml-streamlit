@@ -173,31 +173,42 @@ if st.button("🚀 Predict"):
     show_shap = st.checkbox("🔍 Show model explanation (SHAP)")
 
     if show_shap:
-        try:
-            with st.spinner("Calculating SHAP..."):
+      try:
+    with st.spinner("Calculating SHAP..."):
 
-                X_transformed = transform_input(input_df)
-                shap_values = explainer(X_transformed)
+        X_transformed = transform_input(input_df)
 
-                shap_values.feature_names = feature_names
+        # ❗ старый API (СТАБИЛЬНЫЙ)
+        shap_values = explainer.shap_values(X_transformed)
 
-                # Plot
-                fig, ax = plt.subplots()
-                shap.plots.waterfall(shap_values[0], show=False)
-                st.pyplot(fig)
+        # для бинарной классификации
+        if isinstance(shap_values, list):
+            shap_values = shap_values[1]
 
-                # =============================
-                # TOP FEATURES
-                # =============================
-                st.subheader("Top factors")
+        # Plot
+        fig, ax = plt.subplots()
+        shap.waterfall_plot(
+            shap.Explanation(
+                values=shap_values[0],
+                base_values=explainer.expected_value,
+                data=X_transformed[0],
+                feature_names=feature_names
+            ),
+            show=False
+        )
 
-                values = shap_values.values[0]
-                top_idx = np.argsort(np.abs(values))[::-1][:5]
+        st.pyplot(fig)
 
-                for i in top_idx:
-                    impact = "⬆️ increases" if values[i] > 0 else "⬇️ decreases"
-                    st.write(f"{feature_names[i]} {impact} satisfaction ({values[i]:.3f})")
+        # ТОП ФИЧИ
+        st.subheader("Top factors")
 
-        except Exception as e:
-            st.warning("SHAP failed")
-            st.text(str(e))
+        values = shap_values[0]
+        top_idx = np.argsort(np.abs(values))[::-1][:5]
+
+        for i in top_idx:
+            impact = "⬆️ increases" if values[i] > 0 else "⬇️ decreases"
+            st.write(f"{feature_names[i]} {impact} satisfaction ({values[i]:.3f})")
+
+except Exception as e:
+    st.error("SHAP error")
+    st.text(str(e))
