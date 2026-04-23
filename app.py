@@ -20,13 +20,14 @@ def load_model():
 model = load_model()
 
 # =============================
-# LOAD SHAP (FIXED 🔥)
+# LOAD SHAP (FIXED ✅)
 # =============================
 @st.cache_resource
-def load_explainer(model):
+def load_explainer():
+    # НЕ передаем model в аргументы → нет ошибки hashing
     return shap.TreeExplainer(model.named_steps['clf'])
 
-explainer = load_explainer(model)
+explainer = load_explainer()
 
 # =============================
 # PREPROCESSOR + FEATURE NAMES
@@ -42,7 +43,7 @@ cat_features = preprocessor.transformers_[1][1] \
 feature_names = list(num_features) + list(cat_features)
 
 # =============================
-# CACHE TRANSFORM (⚡ speed)
+# CACHE TRANSFORM
 # =============================
 @st.cache_data
 def transform_input(df):
@@ -72,7 +73,7 @@ travel_type = st.sidebar.selectbox("Type of Travel", ["Business travel", "Person
 flight_class = st.sidebar.selectbox("Class", ["Business", "Eco", "Eco Plus"])
 
 # =============================
-# MAIN INPUT (better layout)
+# MAIN INPUT
 # =============================
 st.header("✈️ Flight Details")
 
@@ -85,7 +86,7 @@ with col2:
     delay_arr = st.number_input("Arrival Delay", 0, 500, 10)
 
 # =============================
-# SERVICES (hidden)
+# SERVICES
 # =============================
 st.subheader("⭐ Service Ratings")
 
@@ -149,7 +150,7 @@ if st.button("🚀 Predict"):
         prob = model.predict_proba(input_df)[0][1]
 
     # =============================
-    # RESULT UI
+    # RESULT
     # =============================
     st.subheader("📊 Result")
 
@@ -167,7 +168,7 @@ if st.button("🚀 Predict"):
         st.write(input_df)
 
     # =============================
-    # SHAP TOGGLE
+    # SHAP
     # =============================
     show_shap = st.checkbox("🔍 Show model explanation (SHAP)")
 
