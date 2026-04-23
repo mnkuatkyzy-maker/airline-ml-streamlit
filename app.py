@@ -20,13 +20,21 @@ def load_model():
 model = load_model()
 
 # =============================
-# LOAD SHAP (без hashing ошибки)
+# LOAD SHAP
 # =============================
 @st.cache_resource
 def load_explainer():
     return shap.TreeExplainer(model.named_steps['clf'])
 
 explainer = load_explainer()
+
+# =============================
+# SESSION STATE (🔥 FIX)
+# =============================
+if "pred" not in st.session_state:
+    st.session_state.pred = None
+    st.session_state.prob = None
+    st.session_state.input_df = None
 
 # =============================
 # PREPROCESSOR
@@ -52,8 +60,7 @@ def transform_input(df):
 # UI
 # =============================
 st.title("✈️ Airline Satisfaction Predictor")
-
-st.markdown("Predict passenger satisfaction using ML model (XGBoost)")
+st.markdown("Predict passenger satisfaction using XGBoost model")
 
 # =============================
 # SIDEBAR
@@ -134,34 +141,43 @@ input_dict.update(service_values)
 input_df = pd.DataFrame([input_dict])
 
 # =============================
-# PREDICTION
+# PREDICT BUTTON
 # =============================
 st.divider()
 
-if st.button("Predict"):
-
+if st.button("🚀 Predict"):
     with st.spinner("Analyzing..."):
         pred = model.predict(input_df)[0]
         prob = model.predict_proba(input_df)[0][1]
 
-    st.subheader("Result")
-    st.metric("Satisfaction Probability", f"{prob:.2%}")
+        # сохраняем состояние
+        st.session_state.pred = pred
+        st.session_state.prob = prob
+        st.session_state.input_df = input_df
 
-    if pred == 1:
-        st.success("Satisfied")
+# =============================
+# SHOW RESULT (🔥 НЕ ПРОПАДАЕТ)
+# =============================
+if st.session_state.pred is not None:
+
+    st.subheader("Result")
+    st.metric("Satisfaction Probability", f"{st.session_state.prob:.2%}")
+
+    if st.session_state.pred == 1:
+        st.success("✅ Passenger is satisfied")
     else:
-        st.error("Not satisfied")
+        st.error("❌ Passenger is NOT satisfied")
 
     # =============================
     # SHAP
     # =============================
-    show_shap = st.checkbox("Show SHAP explanation")
+    show_shap = st.checkbox("🔍 Show SHAP explanation")
 
     if show_shap:
         try:
             with st.spinner("Calculating SHAP..."):
 
-                X_transformed = transform_input(input_df)
+                X_transformed = transform_input(st.session_state.input_df)
 
                 shap_values = explainer.shap_values(X_transformed)
 
@@ -182,7 +198,7 @@ if st.button("Predict"):
 
                 st.pyplot(fig)
 
-                # TOP FEATURES
+                # ТОП ФИЧИ
                 st.subheader("Top factors")
 
                 values = shap_values[0]
